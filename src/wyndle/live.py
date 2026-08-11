@@ -11,7 +11,7 @@ import sys
 import tempfile
 import time
 import wave
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 
 from onvif import ONVIFCamera
@@ -22,6 +22,7 @@ from wyndle.agent.tools import PTZTools
 from wyndle.audio.runtime import PCMFrame, Utterance, VoiceRuntime, VoiceRuntimeConfig
 from wyndle.audio.stt import FasterWhisperSTT
 from wyndle.audio.tts import PiperTTS
+from wyndle.audio.wake import KeywordSpotterConfig, StreamingKeywordSpotter
 from wyndle.camera.go2rtc import Go2RTCBackchannel
 from wyndle.camera.media import capture_jpeg
 from wyndle.camera.ptz import ONVIFPTZAdapter
@@ -33,9 +34,16 @@ from wyndle.vision import VisualQuestionRouter
 class FFmpegPCMSource:
     """Continuously decode the camera microphone to 16 kHz mono signed PCM."""
 
-    def __init__(self, url: str, *, chunk_ms: int = 100) -> None:
+    def __init__(
+        self,
+        url: str,
+        *,
+        chunk_ms: int = 100,
+        frame_observer: Callable[[PCMFrame], None] | None = None,
+    ) -> None:
         self.url = url
         self.chunk_bytes = 16_000 * 2 * chunk_ms // 1000
+        self.frame_observer = frame_observer
         self._process: asyncio.subprocess.Process | None = None
 
     def __aiter__(self) -> AsyncIterator[PCMFrame]:
@@ -66,7 +74,10 @@ class FFmpegPCMSource:
         try:
             while True:
                 data = await self._process.stdout.readexactly(self.chunk_bytes)
-                yield PCMFrame(data=data, captured_at=time.monotonic())
+                frame = PCMFrame(data=data, captured_at=time.monotonic())
+                if self.frame_observer is not None:
+                    self.frame_observer(frame)
+                yield frame
         except asyncio.IncompleteReadError as exc:
             if self._process.returncode not in (None, 0):
                 raise RuntimeError("camera microphone stream ended unexpectedly") from exc
@@ -89,20 +100,23 @@ class EnergyVAD:
         return rms >= self.threshold
 
 
-class EnergyWakeDetector:
-    """Local temporary wake fallback while the custom name model is tuned."""
+class SherpaWakeDetector:
+    """Real local keyword detector for Wyndle and Hey Wyndle."""
 
-    def __init__(self, vad: EnergyVAD, consecutive_chunks: int = 3) -> None:
-        self.vad = vad
-        self.consecutive_chunks = consecutive_chunks
-        self._count = 0
+    def __init__(self, spotter: StreamingKeywordSpotter) -> None:
+        self.spotter = spotter
+        self.state = "listening"
 
     def detect(self, frame: PCMFrame) -> bool:
-        self._count = self._count + 1 if self.vad.is_speech(frame) else 0
-        if self._count >= self.consecutive_chunks:
-            self._count = 0
-            print("[WAKE] voiced local wake accepted", flush=True)
+        count = len(frame.data) // 2
+        if not count:
+            return False
+        values = struct.unpack(f"<{count}h", frame.data)
+        detections = self.spotter.accept_pcm(value / 32768.0 for value in values)
+        if detections:
+            self.state = f"detected:{detections[0].phrase}"
             return True
+        self.state = "listening"
         return False
 
 
@@ -173,6 +187,7 @@ class CameraSpeech:
     async def play(self, audio: Path) -> None:
         with wave.open(str(audio), "rb") as wav:
             duration = wav.getnframes() / wav.getframerate()
+        print(f"[TIMING] monotonic={time.monotonic():.6f} event=speaker_submission", flush=True)
         await self.player.play_file(audio)
         await asyncio.sleep(duration + 0.15)
         await self.player.stop()
@@ -202,13 +217,33 @@ async def run() -> None:
     player = Go2RTCBackchannel(settings.go2rtc_url, settings.go2rtc_stream_name)
     state = AgentStateMachine(initial=AgentState.IDLE_WATCHING)
     vad = EnergyVAD()
+    model = Path(".local/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01")
+    wake = SherpaWakeDetector(
+        StreamingKeywordSpotter(
+            KeywordSpotterConfig(
+                tokens=model / "tokens.txt",
+                encoder=model / "encoder-epoch-12-avg-2-chunk-16-left-64.onnx",
+                decoder=model / "decoder-epoch-12-avg-2-chunk-16-left-64.onnx",
+                joiner=model / "joiner-epoch-12-avg-2-chunk-16-left-64.onnx",
+                keywords=Path("config/wyndle-keywords.txt"),
+            )
+        )
+    )
+    stt = FasterWhisperSTT(Path(settings.whisper_python), Path(settings.whisper_model))
+    await stt.start()
+    warm_path = Path(".local/debug/stt-warmup.wav")
+    warm_path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(warm_path), "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(16_000)
+        output.writeframes(b"\x00\x00" * 1600)
+    await stt.warm(warm_path)
     runtime = VoiceRuntime(
         pcm_source=FFmpegPCMSource(stream),
-        wake_detector=EnergyWakeDetector(vad),
+        wake_detector=wake,
         vad=vad,
-        stt=WhisperRuntimeAdapter(
-            FasterWhisperSTT(Path(settings.whisper_python), Path(settings.whisper_model))
-        ),
+        stt=WhisperRuntimeAdapter(stt),
         router=LocalRouter(VisualQuestionRouter(language, vision), stream, build_ptz(settings)),
         tts=CameraSpeech(piper, player, Path(".local")),
         audio_output=CameraSpeech(piper, player, Path(".local")),
@@ -218,7 +253,10 @@ async def run() -> None:
         config=VoiceRuntimeConfig(backchannel="Yeah?"),
     )
     print("Wyndle is listening locally. Say 'Wyndle'. Ctrl-C to stop.")
-    await runtime.run()
+    try:
+        await runtime.run()
+    finally:
+        await stt.close()
 
 
 def main() -> None:

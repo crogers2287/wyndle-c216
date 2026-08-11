@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterable, AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Protocol, TypeVar
 
 from wyndle.agent.context import ContextKind
@@ -132,6 +133,13 @@ class VoiceRuntime:
         self.config = config or VoiceRuntimeConfig()
         self.echo_guard = EchoGuard(self.config.echo_cooldown_seconds, monotonic=monotonic)
         self._stop = False
+        self._audio_frame_reported = False
+
+    def _event(self, name: str, **fields: object) -> None:
+        wall = datetime.now(UTC).isoformat(timespec="milliseconds")
+        mono = self.monotonic()
+        details = " ".join(f"{key}={value}" for key, value in fields.items())
+        print(f"[TIMING] {wall} monotonic={mono:.6f} event={name} {details}".rstrip(), flush=True)
 
     def stop(self) -> None:
         self._stop = True
@@ -142,6 +150,9 @@ class VoiceRuntime:
         try:
             while not self._stop:
                 frame = await anext(frames)
+                if not self._audio_frame_reported:
+                    self._event("audio_frame_received", captured_at=f"{frame.captured_at:.6f}")
+                    self._audio_frame_reported = True
                 if self.echo_guard.blocks(frame):
                     continue
                 if self.session.expire_if_needed():
@@ -150,6 +161,7 @@ class VoiceRuntime:
                 if not self.session.is_open:
                     if not self.wake_detector.detect(frame):
                         continue
+                    self._event("wake_detected", frame_at=f"{frame.captured_at:.6f}")
                     self.session.open()
                     self.state.transition(AgentState.WAKE_DETECTED, reason="wake word detected")
                     if self.config.backchannel:
@@ -197,6 +209,8 @@ class VoiceRuntime:
             accepted.append(frame)
             speech = self.vad.is_speech(frame) if self.vad is not None else True
             if speech:
+                if not speech_seen:
+                    self._event("utterance_start", frame_at=f"{frame.captured_at:.6f}")
                 speech_seen = True
                 silence_started = None
             elif speech_seen and silence_started is None:
@@ -217,6 +231,7 @@ class VoiceRuntime:
         if not speech_seen:
             return None
         speech_frames = accepted if self.vad is None else [f for f in accepted if speech_seen]
+        self._event("utterance_end", frame_at=f"{accepted[-1].captured_at:.6f}")
         return Utterance(
             pcm=b"".join(frame.data for frame in speech_frames),
             sample_rate=self.config.sample_rate,
@@ -226,12 +241,19 @@ class VoiceRuntime:
 
     async def _handle(self, utterance: Utterance) -> None:
         self.state.transition(AgentState.THINKING, reason="utterance captured")
+        audio_duration = len(utterance.pcm) / (utterance.sample_rate * 2)
+        print(f"[STT AUDIO] duration={audio_duration:.3f}s", flush=True)
+        self._event("stt_start")
         transcript = (await self.stt.transcribe(utterance)).strip()
+        self._event("stt_complete")
+        print(f"[STT] {transcript!r}", flush=True)
         if not transcript:
             self.state.transition(AgentState.CONVERSATION_OPEN, reason="empty transcription")
             return
         self.session.context.add(ContextKind.USER_UTTERANCE, transcript)
+        self._event("llm_start")
         reply = (await self.router.route(transcript, self.session.context.prompt_items())).strip()
+        self._event("llm_result_complete")
         if reply:
             self.session.context.add(ContextKind.AGENT_REPLY, reply)
             await self._speak(reply)
@@ -242,9 +264,14 @@ class VoiceRuntime:
     async def _speak(self, text: str, *, backchannel: bool = False) -> None:
         self.state.transition(AgentState.SPEAKING, reason="backchannel" if backchannel else "reply")
         self.echo_guard.output_started()
+        prefix = "backchannel_" if backchannel else ""
+        self._event(prefix + "tts_start")
         try:
             audio = await self.tts.synthesize(text)
+            self._event(prefix + "tts_complete")
+            self._event(prefix + "speaker_start")
             await self.audio_output.play(audio)
+            self._event(prefix + "speaker_playback_complete")
         finally:
             self.echo_guard.output_finished()
         target = AgentState.LISTENING if backchannel else AgentState.CONVERSATION_OPEN

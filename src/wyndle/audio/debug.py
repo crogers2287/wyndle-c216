@@ -143,10 +143,13 @@ def main() -> None:
     )
     parser.add_argument("--seconds", type=float, default=5.0)
     args = parser.parse_args()
-    if args.capture_pair:
-        asyncio.run(capture_pair(args.seconds, Path(".local/debug")))
-    else:
-        asyncio.run(monitor(args.source, args.wav))
+    try:
+        if args.capture_pair:
+            asyncio.run(capture_pair(args.seconds, Path(".local/debug")))
+        else:
+            asyncio.run(monitor(args.source, args.wav))
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":
