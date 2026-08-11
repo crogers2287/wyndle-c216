@@ -213,7 +213,15 @@ async def run() -> None:
     settings = Settings()
     stream = f"rtsp://127.0.0.1:8554/{settings.go2rtc_stream_name}"
     language = OpenAICompatibleLanguageProvider(
-        base_url=settings.llm_base_url, model=settings.llm_model, timeout=120
+        base_url=settings.llm_base_url,
+        model=settings.llm_model,
+        timeout=30,
+        max_tokens=40,
+        system_prompt=(
+            "You are Wyndle, a voice companion. Answer in one short sentence, normally under "
+            "twelve words. Never explain that more context is needed; ask one brief "
+            "question instead."
+        ),
     )
     vision = OpenAICompatibleVisionProvider(
         base_url=settings.vision_base_url, model=settings.vision_model, timeout=120

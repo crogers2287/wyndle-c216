@@ -27,16 +27,25 @@ class PTZTools:
         self.amounts = amounts or PTZToolAmounts()
 
     async def look_left(self, amount: str = "small") -> None:
-        await self.adapter.relative_move(pan=-self.amounts.resolve(amount))
+        await self._absolute_delta(pan=-self.amounts.resolve(amount))
 
     async def look_right(self, amount: str = "small") -> None:
-        await self.adapter.relative_move(pan=self.amounts.resolve(amount))
+        await self._absolute_delta(pan=self.amounts.resolve(amount))
 
     async def look_up(self, amount: str = "small") -> None:
-        await self.adapter.relative_move(tilt=self.amounts.resolve(amount))
+        await self._absolute_delta(tilt=self.amounts.resolve(amount))
 
     async def look_down(self, amount: str = "small") -> None:
-        await self.adapter.relative_move(tilt=-self.amounts.resolve(amount))
+        await self._absolute_delta(tilt=-self.amounts.resolve(amount))
+
+    async def _absolute_delta(self, pan: float = 0.0, tilt: float = 0.0) -> None:
+        current_pan, current_tilt = await self.adapter.position()
+        limits = self.adapter.limits
+        target_pan = min(limits.max_absolute_pan, max(limits.min_absolute_pan, current_pan + pan))
+        target_tilt = min(
+            limits.max_absolute_tilt, max(limits.min_absolute_tilt, current_tilt + tilt)
+        )
+        await self.adapter.absolute_move(target_pan, target_tilt)
 
     async def stop_looking(self) -> None:
         await self.adapter.stop()

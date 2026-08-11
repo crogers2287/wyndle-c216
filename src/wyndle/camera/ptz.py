@@ -43,6 +43,7 @@ class PTZLimits:
     min_absolute_tilt: float = -1.0
     max_absolute_tilt: float = 1.0
     operation_timeout: float = 3.0
+    movement_settle_seconds: float = 1.0
 
 
 class ONVIFPTZAdapter:
@@ -90,6 +91,18 @@ class ONVIFPTZAdapter:
         }
         await self._move_with_stop("AbsoluteMove", request)
 
+    async def position(self) -> tuple[float, float]:
+        """Return the current normalized pan/tilt position."""
+        async with self._lock:
+            try:
+                status = await self._call(
+                    self._service.GetStatus, {"ProfileToken": self._profile_token}
+                )
+                pan_tilt = status.Position.PanTilt
+                return float(pan_tilt.x), float(pan_tilt.y)
+            except Exception as exc:
+                raise self._connection_error("GetStatus", exc) from exc
+
     async def stop(self) -> None:
         """Explicitly stop both pan/tilt and zoom axes."""
         async with self._lock:
@@ -100,6 +113,7 @@ class ONVIFPTZAdapter:
             move_error: PTZConnectionError | None = None
             try:
                 await self._call(getattr(self._service, method_name), request)
+                await asyncio.sleep(self.limits.movement_settle_seconds)
             except Exception as exc:
                 move_error = self._connection_error(method_name, exc)
             try:

@@ -58,6 +58,8 @@ class _OpenAICompatibleClient:
         api_key: str | None = None,
         timeout: float = 30.0,
         client: httpx.AsyncClient | None = None,
+        max_tokens: int | None = None,
+        system_prompt: str | None = None,
     ) -> None:
         if not base_url:
             raise ValueError("base_url must not be empty")
@@ -68,12 +70,19 @@ class _OpenAICompatibleClient:
         self._api_key = api_key
         self._timeout = timeout
         self._client = client
+        self._max_tokens = max_tokens
+        self._system_prompt = system_prompt
 
     async def _complete(self, messages: Sequence[ChatMessage]) -> str:
         headers = {"Content-Type": "application/json"}
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
-        request = {"model": self.model, "messages": list(messages), "stream": False}
+        prepared = list(messages)
+        if self._system_prompt and not any(item.get("role") == "system" for item in prepared):
+            prepared.insert(0, {"role": "system", "content": self._system_prompt})
+        request: dict[str, Any] = {"model": self.model, "messages": prepared, "stream": False}
+        if self._max_tokens is not None:
+            request["max_tokens"] = self._max_tokens
         owns_client = self._client is None
         client = self._client or httpx.AsyncClient()
         try:

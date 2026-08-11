@@ -41,3 +41,23 @@ def test_visual_classifier() -> None:
     assert is_visual_question("What color is this?")
     assert not is_visual_question("I see what you mean")
     assert not is_visual_question("Say camera speaker online")
+
+
+@pytest.mark.asyncio
+async def test_language_provider_adds_voice_prompt_and_token_cap() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        body = __import__("json").loads(request.content)
+        assert body["max_tokens"] == 40
+        assert body["messages"][0] == {"role": "system", "content": "Be brief."}
+        return httpx.Response(200, json={"choices": [{"message": {"content": "Brief."}}]})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = OpenAICompatibleLanguageProvider(
+        base_url="http://local/v1",
+        model="m",
+        client=client,
+        max_tokens=40,
+        system_prompt="Be brief.",
+    )
+    assert await provider.complete("test") == "Brief."
+    await client.aclose()
