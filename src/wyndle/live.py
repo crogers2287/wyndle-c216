@@ -22,7 +22,6 @@ from wyndle.agent.tools import PTZTools
 from wyndle.audio.runtime import PCMFrame, Utterance, VoiceRuntime, VoiceRuntimeConfig
 from wyndle.audio.stt import FasterWhisperSTT
 from wyndle.audio.tts import PiperTTS
-from wyndle.audio.wake import KeywordSpotterConfig, StreamingKeywordSpotter
 from wyndle.camera.go2rtc import Go2RTCBackchannel
 from wyndle.camera.media import capture_jpeg
 from wyndle.camera.ptz import ONVIFPTZAdapter
@@ -77,16 +76,6 @@ class FFmpegPCMSource:
                 await self._process.wait()
 
 
-class SherpaWakeDetector:
-    def __init__(self, spotter: StreamingKeywordSpotter) -> None:
-        self.spotter = spotter
-
-    def detect(self, frame: PCMFrame) -> bool:
-        count = len(frame.data) // 2
-        integers = struct.unpack(f"<{count}h", frame.data)
-        return bool(self.spotter.accept_pcm(value / 32768.0 for value in integers))
-
-
 class EnergyVAD:
     def __init__(self, threshold: float = 0.012) -> None:
         self.threshold = threshold
@@ -98,6 +87,23 @@ class EnergyVAD:
         values = struct.unpack(f"<{count}h", frame.data)
         rms = math.sqrt(sum(value * value for value in values) / count) / 32768.0
         return rms >= self.threshold
+
+
+class EnergyWakeDetector:
+    """Local temporary wake fallback while the custom name model is tuned."""
+
+    def __init__(self, vad: EnergyVAD, consecutive_chunks: int = 3) -> None:
+        self.vad = vad
+        self.consecutive_chunks = consecutive_chunks
+        self._count = 0
+
+    def detect(self, frame: PCMFrame) -> bool:
+        self._count = self._count + 1 if self.vad.is_speech(frame) else 0
+        if self._count >= self.consecutive_chunks:
+            self._count = 0
+            print("[WAKE] voiced local wake accepted", flush=True)
+            return True
+        return False
 
 
 class WhisperRuntimeAdapter:
@@ -186,18 +192,6 @@ def build_ptz(settings: Settings) -> PTZTools:
 async def run() -> None:
     settings = Settings()
     stream = f"rtsp://127.0.0.1:8554/{settings.go2rtc_stream_name}"
-    model = Path(".local/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01")
-    wake = StreamingKeywordSpotter(
-        KeywordSpotterConfig(
-            tokens=model / "tokens.txt",
-            encoder=model / "encoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx",
-            decoder=model / "decoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx",
-            joiner=model / "joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx",
-            keywords=Path("config/wyndle-keywords.txt"),
-            keywords_score=1.8,
-            keywords_threshold=0.22,
-        )
-    )
     language = OpenAICompatibleLanguageProvider(
         base_url=settings.llm_base_url, model=settings.llm_model, timeout=120
     )
@@ -207,10 +201,11 @@ async def run() -> None:
     piper = PiperTTS(Path(settings.piper_executable), Path(settings.piper_model))
     player = Go2RTCBackchannel(settings.go2rtc_url, settings.go2rtc_stream_name)
     state = AgentStateMachine(initial=AgentState.IDLE_WATCHING)
+    vad = EnergyVAD()
     runtime = VoiceRuntime(
         pcm_source=FFmpegPCMSource(stream),
-        wake_detector=SherpaWakeDetector(wake),
-        vad=EnergyVAD(),
+        wake_detector=EnergyWakeDetector(vad),
+        vad=vad,
         stt=WhisperRuntimeAdapter(
             FasterWhisperSTT(Path(settings.whisper_python), Path(settings.whisper_model))
         ),

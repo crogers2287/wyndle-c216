@@ -10,11 +10,18 @@ def test_happy_path_transitions_are_explicit() -> None:
     machine = AgentStateMachine(now=lambda: now)
 
     path = [
-        AgentState.CAMERA_CONNECTING, AgentState.IDLE_WATCHING,
-        AgentState.WAKE_DETECTED, AgentState.LISTENING, AgentState.THINKING,
-        AgentState.SPEAKING, AgentState.CONVERSATION_OPEN,
-        AgentState.LISTENING, AgentState.THINKING, AgentState.SPEAKING,
-        AgentState.CONVERSATION_OPEN, AgentState.IDLE_WATCHING,
+        AgentState.CAMERA_CONNECTING,
+        AgentState.IDLE_WATCHING,
+        AgentState.WAKE_DETECTED,
+        AgentState.LISTENING,
+        AgentState.THINKING,
+        AgentState.SPEAKING,
+        AgentState.CONVERSATION_OPEN,
+        AgentState.LISTENING,
+        AgentState.THINKING,
+        AgentState.SPEAKING,
+        AgentState.CONVERSATION_OPEN,
+        AgentState.IDLE_WATCHING,
     ]
     for target in path:
         transition = machine.transition(target, reason="test")
@@ -40,3 +47,9 @@ def test_degraded_state_has_recovery_paths() -> None:
 def test_transition_requires_observable_reason() -> None:
     with pytest.raises(ValueError, match="reason"):
         AgentStateMachine().transition(AgentState.CAMERA_CONNECTING, reason="  ")
+
+
+def test_listening_can_return_to_open_session_without_utterance() -> None:
+    machine = AgentStateMachine(initial=AgentState.LISTENING)
+    machine.transition(AgentState.CONVERSATION_OPEN, reason="no speech before timeout")
+    assert machine.state is AgentState.CONVERSATION_OPEN

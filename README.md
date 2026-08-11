@@ -37,7 +37,7 @@ Run the always-on local voice loop:
 ```bash
 uv run wyndle-live
 ```
-Say “Wyndle” or “Hey Wyndle”; follow-ups remain open for the configured timeout.
+The live hardware process currently uses a temporary voiced-audio wake fallback while the custom “Wyndle” KWS model is tuned; speak near the camera, then give the request after “Yeah?”. Follow-ups remain open for the configured timeout.
 
 Run the localhost debug console:
 ```bash

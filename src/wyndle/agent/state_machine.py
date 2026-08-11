@@ -28,7 +28,12 @@ _ALLOWED_TRANSITIONS: dict[AgentState, frozenset[AgentState]] = {
         {AgentState.LISTENING, AgentState.SPEAKING, AgentState.IDLE_WATCHING, AgentState.DEGRADED}
     ),
     AgentState.LISTENING: frozenset(
-        {AgentState.THINKING, AgentState.IDLE_WATCHING, AgentState.DEGRADED}
+        {
+            AgentState.THINKING,
+            AgentState.CONVERSATION_OPEN,
+            AgentState.IDLE_WATCHING,
+            AgentState.DEGRADED,
+        }
     ),
     AgentState.THINKING: frozenset(
         {AgentState.SPEAKING, AgentState.CONVERSATION_OPEN, AgentState.DEGRADED}
