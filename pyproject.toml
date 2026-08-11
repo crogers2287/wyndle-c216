@@ -27,6 +27,8 @@ wyndle-probe = "wyndle.probe:main"
 wyndle-demo = "wyndle.demo:main"
 wyndle-debug = "wyndle.debug_dashboard:main"
 wyndle-live = "wyndle.live:main"
+wyndle-audio-debug = "wyndle.audio.debug:main"
+wyndle-speaker-test = "wyndle.speaker_test:main"
 
 [build-system]
 requires = ["hatchling"]
