@@ -223,19 +223,17 @@ class CapabilityProbe:
             self._onvif_ptz = self._onvif_camera.create_ptz_service()
             nodes = serialize(self._onvif_ptz.GetNodes())
             configs = serialize(self._onvif_ptz.GetConfigurations())
-            operations = sorted(getattr(self._onvif_ptz, "operations", {}).keys())
         except Exception as exc:
             self.record("onvif_ptz", "UNSUPPORTED", actionable_error(exc))
             return
+        node_list = nodes if isinstance(nodes, list) else []
+        spaces = node_list[0].get("SupportedPTZSpaces", {}) if node_list else {}
         movement = {
-            name: name in operations
-            for name in (
-                "ContinuousMove",
-                "RelativeMove",
-                "AbsoluteMove",
-                "GotoPreset",
-                "GotoHomePosition",
-            )
+            "ContinuousMove": bool(spaces.get("ContinuousPanTiltVelocitySpace")),
+            "RelativeMove": bool(spaces.get("RelativePanTiltTranslationSpace")),
+            "AbsoluteMove": bool(spaces.get("AbsolutePanTiltPositionSpace")),
+            "GotoPreset": bool(node_list and node_list[0].get("MaximumNumberOfPresets")),
+            "GotoHomePosition": bool(node_list and node_list[0].get("HomeSupported")),
         }
         advertised = ", ".join(k for k, value in movement.items() if value)
         detail = f"PTZ service exposed; operations={advertised or 'none detected'}"
@@ -312,16 +310,20 @@ class CapabilityProbe:
 
 
 def serialize(value: Any) -> Any:
+    try:
+        from zeep.helpers import serialize_object
+
+        value = serialize_object(value)
+    except Exception:
+        pass
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, dict):
-        return {str(k): serialize(v) for k, v in value.items()}
+        return {
+            str(key): serialize(item) for key, item in value.items() if not str(key).startswith("_")
+        }
     if isinstance(value, (list, tuple)):
-        return [serialize(v) for v in value]
-    if hasattr(value, "__keylist__"):
-        return {key: serialize(getattr(value, key, None)) for key in value.__keylist__}
-    if hasattr(value, "__dict__"):
-        return {k: serialize(v) for k, v in vars(value).items() if not k.startswith("_")}
+        return [serialize(item) for item in value]
     return str(value)
 
 
