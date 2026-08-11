@@ -25,7 +25,7 @@ _ALLOWED_TRANSITIONS: dict[AgentState, frozenset[AgentState]] = {
     AgentState.CAMERA_CONNECTING: frozenset({AgentState.IDLE_WATCHING, AgentState.DEGRADED}),
     AgentState.IDLE_WATCHING: frozenset({AgentState.WAKE_DETECTED, AgentState.DEGRADED}),
     AgentState.WAKE_DETECTED: frozenset(
-        {AgentState.LISTENING, AgentState.IDLE_WATCHING, AgentState.DEGRADED}
+        {AgentState.LISTENING, AgentState.SPEAKING, AgentState.IDLE_WATCHING, AgentState.DEGRADED}
     ),
     AgentState.LISTENING: frozenset(
         {AgentState.THINKING, AgentState.IDLE_WATCHING, AgentState.DEGRADED}
@@ -33,7 +33,9 @@ _ALLOWED_TRANSITIONS: dict[AgentState, frozenset[AgentState]] = {
     AgentState.THINKING: frozenset(
         {AgentState.SPEAKING, AgentState.CONVERSATION_OPEN, AgentState.DEGRADED}
     ),
-    AgentState.SPEAKING: frozenset({AgentState.CONVERSATION_OPEN, AgentState.DEGRADED}),
+    AgentState.SPEAKING: frozenset(
+        {AgentState.LISTENING, AgentState.CONVERSATION_OPEN, AgentState.DEGRADED}
+    ),
     AgentState.CONVERSATION_OPEN: frozenset(
         {AgentState.LISTENING, AgentState.IDLE_WATCHING, AgentState.DEGRADED}
     ),
