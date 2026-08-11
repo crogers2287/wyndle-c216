@@ -19,6 +19,7 @@ from onvif import ONVIFCamera
 from wyndle.agent.session import ConversationSession
 from wyndle.agent.state_machine import AgentState, AgentStateMachine
 from wyndle.agent.tools import PTZTools
+from wyndle.audio.output import condition_c216_audio
 from wyndle.audio.runtime import PCMFrame, Utterance, VoiceRuntime, VoiceRuntimeConfig
 from wyndle.audio.stt import FasterWhisperSTT
 from wyndle.audio.tts import PiperTTS
@@ -181,16 +182,20 @@ class CameraSpeech:
         self.directory = directory
 
     async def synthesize(self, text: str) -> Path:
-        path = (self.directory / "live-response.wav").resolve()
-        return await self.tts.synthesize(text, path)
+        raw = (self.directory / "live-response-raw.wav").resolve()
+        conditioned = (self.directory / "live-response.wav").resolve()
+        await self.tts.synthesize(text, raw)
+        return await condition_c216_audio(raw, conditioned)
 
     async def play(self, audio: Path) -> None:
         with wave.open(str(audio), "rb") as wav:
             duration = wav.getnframes() / wav.getframerate()
         print(f"[TIMING] monotonic={time.monotonic():.6f} event=speaker_submission", flush=True)
-        await self.player.play_file(audio)
-        await asyncio.sleep(duration + 0.15)
-        await self.player.stop()
+        try:
+            await self.player.play_file(audio)
+            await asyncio.sleep(duration + 0.15)
+        finally:
+            await self.player.stop()
 
 
 def build_ptz(settings: Settings) -> PTZTools:

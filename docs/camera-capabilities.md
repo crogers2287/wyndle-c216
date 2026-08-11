@@ -33,7 +33,7 @@ Camera credentials, IP address, and serial number are intentionally omitted here
 | go2rtc Tapo media | PASS | v1.9.14 connected; H.264 receive, PCMA/8000 receive, PCMA/8000 send advertised |
 | Piper local WAV | SIGNAL VERIFIED / HUMAN REVIEW PENDING | Fixed phrase produced PCM mono/16 kHz/16-bit, 2.400 s. Faster-Whisper independently transcribed it as “Hello, this is Wendell testing the camera speaker.” Original is `.local/debug/speaker-test-piper.wav`. |
 | Camera speaker submission | PATH VERIFIED ONLY | Deterministic PCMA/8000 sidecar is `.local/debug/speaker-test-pcma.alaw` (19,200 bytes). go2rtc attachment alone is not audible proof. |
-| Camera speaker audible | UNCONFIRMED | API/media path verified; no independent human/microphone confirmation recorded |
+| Camera speaker audible | PASS WITH CONDITIONING | Human verified “Hello. This is Wyndle testing the camera speaker.” was heard loud and clear after 2.0 s leading silence, 1.0 s trailing silence, 50% level, 180–3400 Hz filtering, and 8 kHz mono PCM before go2rtc PCMA conversion. Unpadded clips lose their beginning; full-level output distorts. |
 
 ## 2026-08-11 media-pipeline milestone
 

@@ -7,6 +7,7 @@ import asyncio
 import wave
 from pathlib import Path
 
+from wyndle.audio.output import condition_c216_audio
 from wyndle.audio.tts import PiperTTS
 from wyndle.camera.go2rtc import Go2RTCBackchannel
 from wyndle.config import Settings
@@ -19,10 +20,12 @@ async def run(*, play: bool) -> None:
     directory = Path(".local/debug")
     directory.mkdir(parents=True, exist_ok=True)
     original = (directory / "speaker-test-piper.wav").resolve()
+    conditioned = (directory / "speaker-test-conditioned.wav").resolve()
     pcma = (directory / "speaker-test-pcma.alaw").resolve()
     await PiperTTS(Path(settings.piper_executable), Path(settings.piper_model)).synthesize(
         PHRASE, original
     )
+    await condition_c216_audio(original, conditioned)
     with wave.open(str(original), "rb") as source:
         channels = source.getnchannels()
         sample_rate = source.getframerate()
@@ -61,8 +64,10 @@ async def run(*, play: bool) -> None:
     player = Go2RTCBackchannel(settings.go2rtc_url, settings.go2rtc_stream_name)
     print("C216_SUBMISSION=START", flush=True)
     try:
-        await player.play_file(original)
-        await asyncio.sleep(duration + 0.15)
+        with wave.open(str(conditioned), "rb") as prepared:
+            conditioned_duration = prepared.getnframes() / prepared.getframerate()
+        await player.play_file(conditioned)
+        await asyncio.sleep(conditioned_duration + 0.15)
     finally:
         await player.stop()
     print("C216_SUBMISSION=COMPLETE audible_result=UNCONFIRMED", flush=True)
