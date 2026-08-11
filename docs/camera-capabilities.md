@@ -20,7 +20,7 @@ Camera credentials, IP address, and serial number are intentionally omitted here
 | IP connectivity | PASS | TCP ports 554 (RTSP) and 2020 (ONVIF) reachable |
 | RTSP main video | PASS | H.264, 2304×1296, 15 FPS |
 | RTSP sub video | PASS | H.264, 1280×720, 15 FPS |
-| RTSP microphone | PASS | G.711 A-law / `pcm_alaw`, 8 kHz advertised by ONVIF |
+| RTSP microphone track | DEGRADED | PCMA track exists, but physical capture returned a constant ±8 PCM value (digital silence); wake/STT cannot work until camera microphone/privacy configuration is corrected |
 | Repeat RTSP opens | PASS | Two fresh substream opens completed in about 2.75–2.80 s |
 | ONVIF device | PASS | Identity and capabilities retrieved |
 | ONVIF media profiles | PASS | Two profiles retrieved |
