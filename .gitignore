@@ -20,3 +20,6 @@ __pycache__/
 openmessage_mcp.log
 .plugin-config/
 .DS_Store
+
+# Downloaded local services and secret-bearing configs
+.local/

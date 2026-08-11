@@ -26,12 +26,13 @@ Camera credentials, IP address, and serial number are intentionally omitted here
 | ONVIF media profiles | PASS | Two profiles retrieved |
 | ONVIF snapshot URI | FAIL/UNSUPPORTED | Both profile calls returned an ONVIF error |
 | ONVIF PTZ service | ADVERTISED | Absolute move, relative move, and up to 8 presets advertised |
-| ONVIF PTZ movement | NOT TESTED | No physical movement issued yet |
+| ONVIF absolute PTZ | PASS | Small +0.04 pan move reached target and returned to starting position |
 | ONVIF continuous PTZ | NOT ADVERTISED | No continuous velocity space returned |
 | ONVIF home | NOT ADVERTISED | `HomeSupported=false` |
 | ONVIF audio output/backchannel | UNSUPPORTED | No audio output or decoder configurations returned |
-| go2rtc | NOT RUNNING | Local API connection refused |
-| Camera speaker output | NOT TESTED | Requires go2rtc Tapo backchannel setup and audible confirmation |
+| go2rtc Tapo media | PASS | v1.9.14 connected; H.264 receive, PCMA/8000 receive, PCMA/8000 send advertised |
+| Camera speaker submission | PASS | Local Piper WAV transcoded to PCMA/8000 and attached to Tapo send channel |
+| Camera speaker audible | UNCONFIRMED | API/media path verified; no independent human/microphone confirmation recorded |
 
 ## Next hardware actions
 

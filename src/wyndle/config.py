@@ -26,6 +26,18 @@ class Settings(BaseSettings):
 
     go2rtc_url: str = "http://127.0.0.1:1984"
     go2rtc_stream_name: str = "wyndle"
+    llm_base_url: str = "http://127.0.0.1:11434/v1"
+    llm_model: str = "qwen2.5:7b"
+    vision_base_url: str = "http://127.0.0.1:11434/v1"
+    vision_model: str = "minicpm-v"
+    piper_executable: str = "/home/crogers2287/piper/venv/bin/piper"
+    piper_model: str = "/home/crogers2287/piper/voices/en_US-ryan-low.onnx"
+    whisper_python: str = "/home/crogers2287/.cache/hermes-whisper-venv/bin/python"
+    whisper_model: str = (
+        "/home/crogers2287/omi-backend/models/"
+        "models--Systran--faster-distil-whisper-large-v3/snapshots/"
+        "c3058b475261292e64a0412df1d2681c06260fab"
+    )
     conversation_timeout_seconds: float = Field(default=15, gt=0)
     persistent_memory_enabled: bool = False
     proactive_speech_enabled: bool = False

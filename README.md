@@ -77,3 +77,30 @@ uv run wyndle
 - active movement/audio tests require explicit operator action
 
 The complete product brief and milestone plan are in [`CODEX_HANDOFF.md`](CODEX_HANDOFF.md).
+
+## Working hardware loop
+
+The verified development-host path is now:
+
+```text
+C216 RTSP microphone/video -> FFmpeg
+C216 video -> local MiniCPM-V through Ollama
+text -> local Piper -> go2rtc Tapo PCMA backchannel -> C216 speaker
+commands -> bounded ONVIF PTZ adapter
+```
+
+Start the private go2rtc instance (its generated config is under gitignored `.local/`):
+
+```bash
+uv run python tools/start_go2rtc.py
+```
+
+Run an end-to-end visual or language question and speak the result from the camera:
+
+```bash
+uv run wyndle-demo What am I holding?
+uv run wyndle-demo Say hello in one short sentence
+```
+
+The current local models are configurable with `LLM_BASE_URL`, `LLM_MODEL`,
+`VISION_BASE_URL`, and `VISION_MODEL`. The defaults use Ollama on localhost.
