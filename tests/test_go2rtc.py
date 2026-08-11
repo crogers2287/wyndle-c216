@@ -49,15 +49,17 @@ async def test_play_file_posts_and_stops():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("wyndle.camera.go2rtc.httpx.AsyncClient", return_value=mock_client):
-        with patch("wyndle.camera.go2rtc.asyncio.sleep", new_callable=AsyncMock) as sleep_mock:
-            ch = Go2RTCBackchannel("http://host", "stream1")
-            with tempfile.NamedTemporaryFile(delete=False) as tf:
-                tf_path = P(tf.name)
-            try:
-                await ch.play_file(tf_path, duration=2.5)
-            finally:
-                tf_path.unlink(missing_ok=True)
+    with (
+        patch("wyndle.camera.go2rtc.httpx.AsyncClient", return_value=mock_client),
+        patch("wyndle.camera.go2rtc.asyncio.sleep", new_callable=AsyncMock) as sleep_mock,
+    ):
+        ch = Go2RTCBackchannel("http://host", "stream1")
+        with tempfile.NamedTemporaryFile(delete=False) as tf:
+            tf_path = P(tf.name)
+        try:
+            await ch.play_file(tf_path, duration=2.5)
+        finally:
+            tf_path.unlink(missing_ok=True)
 
     assert mock_client.post.call_count == 2
     first_params = mock_client.post.call_args_list[0][1]["params"]

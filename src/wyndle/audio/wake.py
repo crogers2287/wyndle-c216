@@ -77,8 +77,27 @@ def create_sherpa_engine(config: KeywordSpotterConfig) -> KeywordEngine:
     config.validate()
     try:
         import sherpa_onnx
-    except ImportError as exc:  # pragma: no cover - depends on host native runtime
-        raise RuntimeError("sherpa-onnx is not available") from exc
+    except ImportError:  # pragma: no cover - host native runtime
+        # Some Linux wheels require the adjacent versioned ONNX Runtime library
+        # to be loaded globally before the sherpa extension is imported.
+        try:
+            import ctypes
+            import importlib
+            import site
+            import sys
+
+            candidates = [
+                Path(base) / "onnxruntime/capi/libonnxruntime.so.1.27.0"
+                for base in site.getsitepackages()
+            ]
+            library = next(path for path in candidates if path.is_file())
+            ctypes.CDLL(str(library), mode=ctypes.RTLD_GLOBAL)
+            for module_name in tuple(sys.modules):
+                if module_name == "sherpa_onnx" or module_name.startswith("sherpa_onnx."):
+                    sys.modules.pop(module_name, None)
+            sherpa_onnx = importlib.import_module("sherpa_onnx")
+        except Exception as exc:
+            raise RuntimeError("sherpa-onnx native runtime is not available") from exc
 
     return sherpa_onnx.KeywordSpotter(
         tokens=str(config.tokens),

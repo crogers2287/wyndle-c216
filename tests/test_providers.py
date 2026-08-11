@@ -40,3 +40,4 @@ def test_visual_classifier() -> None:
     assert is_visual_question("What am I holding?")
     assert is_visual_question("What color is this?")
     assert not is_visual_question("I see what you mean")
+    assert not is_visual_question("Say camera speaker online")

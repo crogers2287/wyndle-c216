@@ -35,9 +35,11 @@ async def test_capture_jpeg_returns_stdout():
 @pytest.mark.asyncio
 async def test_capture_jpeg_raises_on_error():
     fake = FakeProc(returncode=1, stderr=b"ffmpeg error")
-    with patch("wyndle.camera.media.asyncio.create_subprocess_exec", return_value=fake):
-        with pytest.raises(MediaError, match="ffmpeg failed"):
-            await capture_jpeg("rtsp://example/stream")
+    with (
+        patch("wyndle.camera.media.asyncio.create_subprocess_exec", return_value=fake),
+        pytest.raises(MediaError, match="ffmpeg failed"),
+    ):
+        await capture_jpeg("rtsp://example/stream")
 
 
 @pytest.mark.asyncio
@@ -47,9 +49,11 @@ async def test_capture_jpeg_timeout():
 
     fake = FakeProc()
     fake.communicate = boom  # type: ignore[assignment]
-    with patch("wyndle.camera.media.asyncio.create_subprocess_exec", return_value=fake):
-        with pytest.raises(MediaError, match="timed out"):
-            await capture_jpeg("rtsp://example/stream", timeout=0.001)
+    with (
+        patch("wyndle.camera.media.asyncio.create_subprocess_exec", return_value=fake),
+        pytest.raises(MediaError, match="timed out"),
+    ):
+        await capture_jpeg("rtsp://example/stream", timeout=0.001)
 
 
 @pytest.mark.asyncio

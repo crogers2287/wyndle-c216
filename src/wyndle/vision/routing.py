@@ -23,7 +23,6 @@ _VISUAL_PATTERNS = tuple(
         ),
         r"\b(?:in|from) (?:this|the) (?:image|picture|frame|camera|scene)\b",
         r"\bwhat color is (?:this|that|the object)\b",
-        r"\b(?:camera|picture|image|frame)\b",
     )
 )
 

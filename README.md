@@ -2,7 +2,7 @@
 
 Local-first AI companion prototype for one TP-Link Tapo C216. Goal: prove the physical camera loop — video, microphone, speaker, PTZ — before building the conversational agent.
 
-> Status: Milestones 0 and passive Milestone 1 implemented. Camera capabilities must be verified with the probe before use.
+> Status: physical C216 media, microphone, bounded PTZ, local vision/language, TTS, and go2rtc speaker submission paths are working. Wake-word and continuous voice orchestration are implemented and ready for live tuning.
 
 ## Quick start
 
@@ -32,7 +32,20 @@ Start go2rtc for speaker backchannel
 uv run python tools/start_go2rtc.py
 ```
 
-Run a demo
+
+Run the always-on local voice loop:
+```bash
+uv run wyndle-live
+```
+Say “Wyndle” or “Hey Wyndle”; follow-ups remain open for the configured timeout.
+
+Run the localhost debug console:
+```bash
+uv run wyndle-debug
+# open http://127.0.0.1:8765
+```
+
+Run a typed demo
 ```bash
 uv run wyndle-demo "What am I holding?"
 uv run wyndle-demo "Say hello in one short sentence"
