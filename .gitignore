@@ -1,0 +1,22 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Local probe output (may contain LAN addresses/device metadata)
+data/capability-report.json
+data/*.wav
+data/*.pcm
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Runtime/editor artifacts
+openmessage_mcp.log
+.plugin-config/
+.DS_Store
